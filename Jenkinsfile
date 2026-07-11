@@ -1,35 +1,64 @@
 pipeline {
     agent any
+
+    environment {
+        APP_NAME = ''
+        APP_VERSION = ''
+    }
+
     options {
-        //disableConcurrentBuilds()
         timeout(time: 5, unit: 'MINUTES')
     }
+
     stages {
-        stage('Read Version') {
+        stage('Pull Docker Image') {
             steps {
                 script {
                     def packageJson = readJSON file: 'package.json'
-                    appName = packageJson.name
-                    appVersion = packageJson.version
-                    echo "Building ${appName} version ${appVersion}"
+
+                    env.APP_NAME = packageJson.name
+                    env.APP_VERSION = packageJson.version
+
+                    echo "Pulling ${env.APP_NAME} version ${env.APP_VERSION}"
                 }
-            }
-        }
-        stage('Install Dependencies') {
-            steps {
+
                 sh '''
-                    
+                    docker pull ruthvikk1214/catalogue:$APP_VERSION
                 '''
             }
         }
-        stage('Build Docker Image') {
+
+        stage('Scan Image with Trivy') {
             steps {
-                sh """
-                    echo "Building Docker image"
-                    docker build -t ${appName}:${appVersion} .
-                """
+                sh '''
+                    trivy image \
+                    --severity HIGH,CRITICAL \
+                    --exit-code 1 \
+                    ruthvikk1214/catalogue:$APP_VERSION
+                '''
             }
         }
-        
+
+        stage('Create K8s Deployment') {
+            steps {
+                sh '''
+                    kubectl apply -f manifest.yaml -n roboshop
+                '''
+            }
+        }
+
+        stage('Verify Catalogue Deployment') {
+            steps {
+                sh '''
+                    kubectl rollout status deployment/catalogue \
+                    -n roboshop \
+                    --timeout=120s
+
+                    kubectl get pods \
+                    -n roboshop \
+                    -l component=catalogue
+                '''
+            }
+        }
     }
 }
