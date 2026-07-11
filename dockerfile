@@ -12,5 +12,5 @@ WORKDIR /app
 EXPOSE 8080
 COPY --from=builder /app /app
 ENV MONGO="true" \
-    MONG0_URL="mongodb://mongodb:27017/catalogue"
+    MONGO_URL="mongodb://mongodb:27017/catalogue"
 CMD ["node", "server.js"]

@@ -1,9 +1,5 @@
 pipeline {
-    agent any {
-        node {
-            label 'linux'
-        }
-    }
+    agent any
     options {
         //disableConcurrentBuilds()
         timeout(time: 5, unit: 'MINUTES')
@@ -34,6 +30,6 @@ pipeline {
                 """
             }
         }
-        stage
+        
     }
 }
