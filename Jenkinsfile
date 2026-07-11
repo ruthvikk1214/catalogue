@@ -2,8 +2,10 @@ pipeline {
     agent any
 
     environment {
-        APP_NAME = ''
-        APP_VERSION = ''
+        APP_NAME = 'catalogue'
+        APP_VERSION = '1.0'
+        IMAGE = 'ruthvikk1214/catalogue:1.0'
+        NAMESPACE = 'roboshop'
     }
 
     options {
@@ -13,17 +15,9 @@ pipeline {
     stages {
         stage('Pull Docker Image') {
             steps {
-                script {
-                    def packageJson = readJSON file: 'package.json'
-
-                    env.APP_NAME = packageJson.name
-                    env.APP_VERSION = packageJson.version
-
-                    echo "Pulling ${env.APP_NAME} version ${env.APP_VERSION}"
-                }
-
                 sh '''
-                    docker pull ruthvikk1214/catalogue:$APP_VERSION
+                    echo "Pulling $IMAGE"
+                    docker pull $IMAGE
                 '''
             }
         }
@@ -31,10 +25,12 @@ pipeline {
         stage('Scan Image with Trivy') {
             steps {
                 sh '''
+                    echo "Scanning $IMAGE"
+
                     trivy image \
                     --severity HIGH,CRITICAL \
                     --exit-code 1 \
-                    ruthvikk1214/catalogue:$APP_VERSION
+                    $IMAGE
                 '''
             }
         }
@@ -42,7 +38,11 @@ pipeline {
         stage('Create K8s Deployment') {
             steps {
                 sh '''
-                    kubectl apply -f manifest.yaml -n roboshop
+                    echo "Deploying $APP_NAME"
+
+                    kubectl apply \
+                    -f manifest.yaml \
+                    -n $NAMESPACE
                 '''
             }
         }
@@ -50,13 +50,16 @@ pipeline {
         stage('Verify Catalogue Deployment') {
             steps {
                 sh '''
-                    kubectl rollout status deployment/catalogue \
-                    -n roboshop \
+                    echo "Verifying $APP_NAME deployment"
+
+                    kubectl rollout status \
+                    deployment/$APP_NAME \
+                    -n $NAMESPACE \
                     --timeout=120s
 
                     kubectl get pods \
-                    -n roboshop \
-                    -l component=catalogue
+                    -n $NAMESPACE \
+                    -l component=$APP_NAME
                 '''
             }
         }
