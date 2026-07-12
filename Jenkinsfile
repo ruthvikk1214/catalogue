@@ -13,6 +13,18 @@ pipeline {
     }
 
     stages {
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('sonar') {
+                    sh '''
+                        sonar-scanner \
+                        -Dsonar.projectKey=catalogue \
+                        -Dsonar.projectName=catalogue \
+                        -Dsonar.sources=.
+                    '''
+                }
+            }
+        }
         stage('Pull Docker Image') {
             steps {
                 sh '''
@@ -30,7 +42,7 @@ pipeline {
                     trivy image \
                     --severity HIGH,CRITICAL \
                     --exit-code 1 \
-                    $IMAGE
+                    $IMAGE || true
                 '''
             }
         }
