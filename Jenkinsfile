@@ -60,6 +60,9 @@ pipeline {
                 sh '''
                     echo "Deploying $APP_NAME"
 
+                    # Authenticate and point kubectl to the EKS cluster
+                    aws eks update-kubeconfig --name roboshop --region us-east-1
+
                     kubectl apply \
                     -f manifest.yaml \
                     -n $NAMESPACE
