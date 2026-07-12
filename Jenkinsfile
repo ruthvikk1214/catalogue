@@ -17,6 +17,14 @@ pipeline {
             steps {
                 withSonarQubeEnv('sonar-server') {
                     sh '''
+                        # Download sonar-scanner CLI if not present on the agent
+                        if ! command -v sonar-scanner &> /dev/null; then
+                            echo "Installing SonarQube Scanner CLI..."
+                            curl -sSLo /tmp/sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+                            unzip -q -o /tmp/sonar-scanner.zip -d /tmp/
+                            export PATH="/tmp/sonar-scanner-5.0.1.3006-linux/bin:$PATH"
+                        fi
+
                         sonar-scanner \
                         -Dsonar.projectKey=catalogue \
                         -Dsonar.projectName=catalogue \
