@@ -4,7 +4,8 @@ pipeline {
     environment {
         APP_NAME       = 'catalogue'
         ECR_REPO       = 'roboshop/catalogue'
-        AWS_REGION     = 'ap-south-1'
+        ECR_REGION     = 'ap-south-1'
+        EKS_REGION     = 'us-east-1'
         AWS_ACCOUNT_ID = '628087992516'
         NAMESPACE      = 'roboshop'
     }
@@ -18,8 +19,9 @@ pipeline {
             steps {
                 script {
                     def pkg = readJSON file: 'package.json'
-                    env.APP_VERSION = pkg.version
-                    env.FULL_IMAGE = "${env.AWS_ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}:${env.APP_VERSION}"
+                    // Append build number to prevent ECR immutable tag push errors
+                    env.APP_VERSION = "${pkg.version}-${BUILD_NUMBER}"
+                    env.FULL_IMAGE  = "${env.AWS_ACCOUNT_ID}.dkr.ecr.${env.ECR_REGION}.amazonaws.com/${env.ECR_REPO}:${env.APP_VERSION}"
                     echo "Application version: ${env.APP_VERSION}"
                     echo "Target image: ${env.FULL_IMAGE}"
                 }
@@ -29,17 +31,16 @@ pipeline {
         stage('Build & Push Docker Image') {
             steps {
                 script {
-                    // Use Jenkins AWS Credentials binding
                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
                                      credentialsId: 'aws-creds',
                                      accessKeyVariable: 'AWS_ACCESS_KEY_ID',
                                      secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
                         sh '''
                             # Log in to ECR
-                            aws ecr get-login-password --region ${AWS_REGION} | \
-                                docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+                            aws ecr get-login-password --region ${ECR_REGION} | \
+                                docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${ECR_REGION}.amazonaws.com
 
-                            # Build, tag and push the image
+                            # Build and push the image
                             docker build -t ${FULL_IMAGE} .
                             docker push ${FULL_IMAGE}
                         '''
@@ -52,7 +53,11 @@ pipeline {
             steps {
                 sh '''
                     echo "Scanning ${FULL_IMAGE}"
-                    trivy image --severity HIGH,CRITICAL --exit-code 1 ${FULL_IMAGE} || true
+                    if command -v trivy &> /dev/null; then
+                        trivy image --severity HIGH,CRITICAL --exit-code 1 ${FULL_IMAGE} || true
+                    else
+                        echo "Trivy not installed on agent, skipping security scan."
+                    fi
                 '''
             }
         }
@@ -65,10 +70,13 @@ pipeline {
                                      accessKeyVariable: 'AWS_ACCESS_KEY_ID',
                                      secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
                         sh '''
-                            echo "Deploying ${APP_NAME}"
-                            aws eks update-kubeconfig --name roboshop --region ${AWS_REGION}
-                            # Update manifest with new image tag if needed
+                            echo "Connecting to EKS cluster in ${EKS_REGION}..."
+                            aws eks update-kubeconfig --name roboshop --region ${EKS_REGION}
+
+                            # Update manifest with new image tag
                             sed -i "s|image:.*|image: ${FULL_IMAGE}|g" manifest.yaml
+
+                            # Apply Kubernetes manifests
                             kubectl apply -f manifest.yaml -n ${NAMESPACE}
                         '''
                     }
@@ -78,11 +86,18 @@ pipeline {
 
         stage('Verify Catalogue Deployment') {
             steps {
-                sh '''
-                    echo "Verifying ${APP_NAME} deployment"
-                    kubectl rollout status deployment/${APP_NAME} -n ${NAMESPACE} --timeout=120s
-                    kubectl get pods -n ${NAMESPACE} -l component=${APP_NAME}
-                '''
+                script {
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
+                                     credentialsId: 'aws-creds',
+                                     accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                                     secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
+                        sh '''
+                            echo "Verifying ${APP_NAME} deployment..."
+                            kubectl rollout status deployment/${APP_NAME} -n ${NAMESPACE} --timeout=120s
+                            kubectl get pods -n ${NAMESPACE} -l component=${APP_NAME}
+                        '''
+                    }
+                }
             }
         }
     }
@@ -97,4 +112,4 @@ pipeline {
         success { echo "✅ Pipeline completed successfully." }
         failure { echo "❌ Pipeline failed. Check console output for details." }
     }
-}
+}
