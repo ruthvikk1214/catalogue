@@ -77,7 +77,7 @@ pipeline {
             }
         }
 
-        stage('Create K8s Deployment') {
+        /* stage('Create K8s Deployment') {
             steps {
                 script {
                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
@@ -114,7 +114,7 @@ pipeline {
                     }
                 }
             }
-        }
+        } */
     }
 
     post {
