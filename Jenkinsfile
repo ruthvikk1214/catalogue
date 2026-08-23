@@ -57,11 +57,13 @@ pipeline {
             steps {
                 sh '''
                     echo "Scanning ${FULL_IMAGE}"
-                    if command -v trivy &> /dev/null; then
-                        trivy image --severity HIGH,CRITICAL --exit-code 1 ${FULL_IMAGE} || true
-                    else
-                        echo "Trivy not installed on agent, skipping security scan."
+                    if ! command -v trivy &> /dev/null; then
+                        echo "Trivy not found, installing..."
+                        # Install wget if needed
+                        sudo dnf -y install wget || true
+                        wget -qO - https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
                     fi
+                    trivy image --severity HIGH,CRITICAL --exit-code 1 ${FULL_IMAGE} || true
                 '''
             }
         }
