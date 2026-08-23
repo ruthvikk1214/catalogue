@@ -33,14 +33,30 @@ pipeline {
         //         }
         //     }
         // }
-        stage('Pull Docker Image') {
+        stage('Read version') {
+            steps {
+                script {
+                    def packageJson = readJSON file: 'package.json' 
+                    appVersion = packageJson.version
+                }
+            }
+        }
+        stage('Build Docker Image') {
             steps {
                 sh '''
-                    echo "Pulling $IMAGE"
-                    docker pull $IMAGE
+                    echo "Building $IMAGE"
+                    docker build -t $IMAGE .
                 '''
             }
         }
+        // stage('Pull Docker Image') {
+        //     steps {
+        //         sh '''
+        //             echo "Pulling $IMAGE"
+        //             docker pull $IMAGE
+        //         '''
+        //     }
+        // }
 
         stage('Scan Image with Trivy') {
             steps {
