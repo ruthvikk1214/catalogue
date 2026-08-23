@@ -28,10 +28,11 @@ pipeline {
         stage('Build & Push Docker Image') {
             steps {
                 script {
-                    // Use Jenkins credentials for AWS (Access Key ID / Secret Access Key)
-                    withCredentials([usernamePassword(credentialsId: 'aws-creds',
-                                                    usernameVariable: 'AWS_ACCESS_KEY_ID',
-                                                    passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                    // Use Jenkins AWS Credentials binding
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
+                                     credentialsId: 'aws-creds',
+                                     accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                                     secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
                         // Configure AWS CLI for the given region
                         sh "aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID"
                         sh "aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY"
