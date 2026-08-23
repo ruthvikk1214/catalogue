@@ -74,11 +74,6 @@ pipeline {
                                      accessKeyVariable: 'AWS_ACCESS_KEY_ID',
                                      secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
                         sh '''
-                            # DEBUG: show which IAM identity kubectl will use
-                            echo "=== IAM CALLER IDENTITY ==="
-                            aws sts get-caller-identity
-                            echo "==========================="
-
                             echo "Connecting to EKS cluster in ${EKS_REGION}..."
                             aws eks update-kubeconfig --name roboshop --region ${EKS_REGION}
 
