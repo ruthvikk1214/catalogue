@@ -58,10 +58,10 @@ pipeline {
                 sh '''
                     echo "Scanning ${FULL_IMAGE}"
                     if ! command -v trivy &> /dev/null; then
-                        echo "Trivy not found, installing..."
-                        # Install wget if needed
-                        sudo dnf -y install wget || true
-                        wget -qO - https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
+                        echo "Trivy not found, installing to user bin..."
+                        mkdir -p $HOME/.local/bin
+                        wget -qO - https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b $HOME/.local/bin
+                        export PATH=$HOME/.local/bin:$PATH
                     fi
                     trivy image --severity HIGH,CRITICAL --exit-code 1 ${FULL_IMAGE} || true
                 '''
