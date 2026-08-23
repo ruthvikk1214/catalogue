@@ -44,10 +44,17 @@ pipeline {
         }
         stage('Build Docker Image') {
             steps {
-                sh '''
-                    echo "Building $IMAGE"
-                    docker build -t $IMAGE .
-                '''
+                script{
+                    withAWS(credentials: 'aws-creds', region: 'us-east-1') {
+                        sh '''
+                        aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com
+                        docker build -t ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/${APP_NAME}:${appVersion} .
+                        docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/${APP_NAME}:${appVersion}
+                        echo "Building $IMAGE"
+                    '''
+                    }
+                }
+                
             }
         }
         // stage('Pull Docker Image') {
