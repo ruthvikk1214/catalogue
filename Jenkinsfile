@@ -31,7 +31,16 @@ pipeline {
                 }
             }
         }
-
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    def scannerHome = tool 'sonar' , type: 'hudson.plugins.sonar.SonarRunnerInstallation'
+                    withSonarQubeEnv('sonar') {
+                        sh "${scannerHome}/bin/sonar-scanner" 
+                    }
+                }
+            }
+        }
         stage('Build & Push Docker Image') {
             steps {
                 script {
