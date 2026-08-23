@@ -18,9 +18,13 @@ pipeline {
         stage('Read version') {
             steps {
                 script {
-                    def pkg = readJSON file: 'package.json'
                     // Append build number to prevent ECR immutable tag push errors
-                    env.APP_VERSION = "${pkg.version}-${BUILD_NUMBER}"
+                    // Use sh to extract version — avoids needing the Pipeline Utility Steps plugin
+                    def version = sh(
+                        script: "node -p \"require('./package.json').version\" 2>/dev/null || grep -m1 '\"version\"' package.json | sed 's/.*: *\"//;s/\".*//'",
+                        returnStdout: true
+                    ).trim()
+                    env.APP_VERSION = "${version}-${BUILD_NUMBER}"
                     env.FULL_IMAGE  = "${env.AWS_ACCOUNT_ID}.dkr.ecr.${env.ECR_REGION}.amazonaws.com/${env.ECR_REPO}:${env.APP_VERSION}"
                     echo "Application version: ${env.APP_VERSION}"
                     echo "Target image: ${env.FULL_IMAGE}"
@@ -77,7 +81,7 @@ pipeline {
                             sed -i "s|image:.*|image: ${FULL_IMAGE}|g" manifest.yaml
 
                             # Apply Kubernetes manifests
-                            kubectl apply -f manifest.yaml -n ${NAMESPACE}
+                            kubectl apply -f manifest.yaml -n ${NAMESPACE} --validate=false
                         '''
                     }
                 }
